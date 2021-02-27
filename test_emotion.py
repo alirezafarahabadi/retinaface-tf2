@@ -22,6 +22,27 @@ flags.DEFINE_float('score_th', 0.5, 'score threshold for nms')
 flags.DEFINE_float('down_scale_factor', 1.0, 'down-scale factor for inputs')
 
 
+
+def put_text(img, result, img_h):
+    text = ""
+    if result == 0:
+        text = "Angry"
+    elif result == 1:
+        text = "Disgust"
+    elif result == 2:
+        text = "Fear"
+    elif result == 3:
+        text = "Happy"
+    elif result == 4:
+        text = "Sad"
+    elif result == 5:
+        text = "Surprise"
+    elif result == 6:
+        text = "Neutral"
+    
+    cv2.putText(img, text, (50, img_h - 50),
+                cv2.FONT_HERSHEY_DUPLEX, 2, (255, 255, 255))
+
 def image_resize(image, width = None, height = None, inter = cv2.INTER_AREA):
     dim = None
     (h, w) = image.shape[:2]
@@ -145,14 +166,28 @@ def main(_argv):
 
             # draw results
             for prior_index in range(len(outputs)):
-                draw_bbox_landm(frame, outputs[prior_index], frame_height,
-                                frame_width)
+                x1, x2, y1, y2 = draw_bbox_landm(frame, outputs[prior_index], frame_height, frame_width)
+                crop_img = frame[y1:y2, x1:x2]
+            if (crop_img.size != 0):
+                crop_img = image_resize(crop_img, 48, 48)
+                crop_img = cv2.resize(crop_img, (48, 48), interpolation=cv2.INTER_LINEAR)
+                if(len(crop_img.shape)==3):
+                  crop_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
+                crop_img = crop_img.astype('float32') / 255.0
+                crop_img = np.array(crop_img.reshape([1, crop_img.shape[0], crop_img.shape[1], 1]))
+                result = predict.predict_emotion(crop_img)
+                # print(result)
+                # print("result for face {}: ".format(w), np.argmax(result, axis = 1))
+                res = np.argmax(result, axis = 1)
+                put_text(frame, res, frame_height)
+                
+
 
             # calculate fps
             fps_str = "FPS: %.2f" % (1 / (time.time() - start_time))
             start_time = time.time()
-            cv2.putText(frame, fps_str, (25, 25),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.75, (0, 255, 0), 2)
+            cv2.putText(frame, fps_str, (50, 50 ),
+                        cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 0), 2)
 
             # show frame
             cv2.imshow('frame', frame)
